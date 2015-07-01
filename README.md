@@ -22,3 +22,4 @@ Thanks!
 -------
 
 - Tim Berglund, for the origin [loglive](https://gist.github.com/tlberglund/3714970) implementation.
+  This was a nice idea. I've genericized it to "git watch" for observing and responding to ref changes.
