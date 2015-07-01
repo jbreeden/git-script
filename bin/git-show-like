@@ -1,0 +1,38 @@
+usage = <<EOS
+  Description:
+    Shows all references (branches, etc) that are at the revision given as an argument
+
+  Usage
+    git show-like COMMITISH
+
+  Arguments
+    COMMITISH
+      May be a ref name (like a branch), or a commit hash
+EOS
+
+require_relative '../private_lib/yargs'
+
+yargs = Yargs.new(ARGV, :consume)
+help = yargs.flag(:h)
+
+if help
+  puts usage
+  exit 0
+end
+
+unless ARGV.length == 1
+  puts usage
+  exit 1
+end
+
+rev = ARGV[0]
+
+unless system("git rev-parse #{rev} 1> #{File::NULL} 2> #{File::NULL}")
+  $stderr.puts "#{rev} does not refer to any known object in this git repo"
+  exit 1
+end
+
+revision = `git rev-parse #{rev}`.strip
+`git show-ref`.each_line.grep(/#{revision}/).each do |l|
+  puts l
+end

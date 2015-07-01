@@ -1,0 +1,79 @@
+usage = <<EOS
+Description:
+  Shows all branch references that have not been merged into the specified HEAD
+
+Usage:
+  git show-unmerged [COMMIT]
+
+Arguments
+  COMMIT
+    May be a ref name (like a branch), or a commit hash.
+    Defaults to HEAD
+
+Options
+  -h
+    Show the command usage
+
+Examples
+  Show every reference (branch, tag, etc) that is not merged into master
+    `git ls-unmerged master`
+EOS
+
+require_relative '../private_lib/yargs'
+
+yargs = Yargs.new(ARGV, :consume)
+help = yargs.flag(:h)
+
+if help
+  puts usage
+  exit 0
+end
+
+rev = 'HEAD'
+if ARGV.length > 1
+  $stderr.puts "Too many arguments"
+  $stderr.puts usage
+  exit 1
+elsif ARGV.length == 1
+  rev = ARGV[0]
+end
+
+unless system("git rev-parse #{rev} 1> #{File::NULL} 2> #{File::NULL}")
+  $stderr.puts "#{rev} does not refer to any known object in this git repo"
+  exit 1
+end
+
+head = `git rev-parse #{rev}`.strip
+
+# Naive Attempt
+# -------------
+#
+# Could use git to check if each ref is an ancestor of head, like this:
+# ```Ruby
+# `git show-ref`.each_line do |l|
+#   commit = l[/(\S+)\s.*/, 1]
+#   puts l unless system("git merge-base --is-ancestor #{commit} #{head}")
+# end
+# ```
+# However, that requires walking the commit graph many, many times. On each
+# walk, git has to compare each ancestor of head to the current ref.
+# That's a lot of duplicated work, and the runtime can be shrank down
+# minutes to seconds (given a history of about 150k commits) by
+# hashing all the commits in head's log, then using this to lookup
+# each ref. If it's in the hash, then it's an ancestor
+
+ancestors = {}
+# This will hash all ancestor commits by their sha
+`git log --pretty=format:"%H" #{head}`.each_line do |l|
+  ancestors[l.strip] = true
+end
+
+# Now that the ancestry is hashed,
+`git show-ref`.each_line do |l|
+  match = l.match(/(\S+)\s+(.*)$/)
+  sha = match[1]
+  name = match[2]
+  unless ancestors[sha]
+    puts "#{sha} #{name}"
+  end
+end

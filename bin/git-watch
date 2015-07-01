@@ -1,0 +1,158 @@
+usage = <<EOS
+Description
+  Watch a git reference (like HEAD) for changes. Each time the value of the reference
+  changes, COMMAND is executed.
+
+Usage
+  git watch REF [OPTION]... --exec COMMAND
+  git watch --all [OPTION]... --exec COMMAND
+  git watch --pattern REGEX [OPTION]... --exec COMMAND
+
+Options
+
+  What to Watch
+    If none of these options are specified, HEAD is implied
+
+    REF
+      The git reference to watch. May be any branch or tag name.
+
+    --all
+      Watch all references (as discovered by `git show-ref`)
+      This option overwrites --pattern and REF.
+
+    --pattern REGEX
+      Watch all references whose names match the regex.
+      This option overwrites any supplied REF.
+
+  How to Start
+    If no seed value is provided, the COMMAND will be run immediately
+    for every watched reference
+
+    --seed SEED
+      Consider SEED to be the initial value of ref.
+      This is useful if your watch routine has been restarted,
+      and needs to pick up where it left off. You would seed the previously
+      known value, so that COMMAND wouldn't be executed unless there has
+      been a change.
+      This option is overwritten by --seed-current.
+
+    --seed-current
+      Assume the previous value is the same as the current.
+      That is, do not run COMMAND until REF changes from the current value.
+      This option takes precedence over --seed.
+
+  How to React
+
+    --exec COMMAND
+      Execute the given COMMAND each time the ref's value changes.
+      Three environment variables will be set prior to running COMMAND
+        + GIT_WATCH_REF = The REF value as passed to this watch command
+        + GIT_WATCH_PREVIOUS = The previous value of the REF
+        + GIT_WATCH_CURRENT = The current value of the REF
+      The ref values will be set as determined by `git rev-parse REF`.
+      If no seed is given, GIT_WATCH_PREVIOUS will be the empty string on the first
+      invocation.
+
+  How to Repeat
+    --fetch
+      Run a `git fetch --all` between each interation
+
+    --interval SECONDS
+      Sleep for this long between polling cycles.
+      Default is 1 second.
+EOS
+
+require_relative '../private_lib/yargs'
+require_relative '../private_lib/git'
+
+trap(:SIGINT) do
+  exit 0
+end
+
+yargs = Yargs.new(ARGV, :consume)
+all = yargs.flag(:all)
+command = yargs.value(:e, :exec)
+fetch = yargs.flag(:fetch)
+help = yargs.flag(:h)
+interval = yargs.value(:interval)
+interval = interval ? interval.to_i : 1
+pattern = yargs.value(:pattern)
+seed = yargs.value(:seed)
+seed_current = yargs.flag('seed-current')
+
+if help
+  puts usage
+  exit 0
+end
+
+unless ARGV.length <= 1
+  $stderr.puts "Too many arguments"
+  $stderr.puts usage
+  exit 1
+end
+
+unless command
+  $stderr.puts "Missing required option --exec"
+  $stderr.puts usage
+  exit 1
+end
+
+if interval == 0 # Like when .to_i is called on a string that isn't a number
+  $stderr.puts "Invalid interval specified"
+  $stderr.puts usage
+  exit 1
+end
+
+refs = []
+if all
+  refs = Git.ref_names
+elsif pattern
+  refs = Git.ref_names(pattern)
+elsif ARGV.length == 1
+  ref = ARGV.shift
+  unless system("git rev-parse #{ref} > #{File::NULL} 2> #{File::NULL}")
+    $stderr.puts "#{ref} does not refer to any object in the current repo"
+    exit 1
+  end
+  refs.push ref
+else
+  refs.push 'HEAD'
+end
+
+prev_values = {}
+refs.each do |ref|
+  prev_values[ref] = seed_current ? `git rev-parse #{ref}`.strip : seed
+end
+
+loop {
+  refs.each do |ref|
+    curr_val = `git rev-parse #{ref}`.strip
+
+    if curr_val != prev_values[ref]
+      ENV['GIT_WATCH_REF'] = ref
+      ENV['GIT_WATCH_PREVIOUS'] = prev_values[ref] || ''
+      ENV['GIT_WATCH_CURRENT'] = curr_val
+      puts "Executing watch command for #{ENV['GIT_WATCH_REF']}"
+      spawn command
+      Process.waitall
+    end
+
+    prev_values[ref] = curr_val
+  end
+
+  sleep interval
+
+  if fetch
+    unless system "git fetch --all 1> #{File::NULL} 2> #{File::NULL}"
+      $stderr.puts "Failed to execute git fetch"
+      exit 1
+    end
+  end
+
+  # Make sure to get any new refs (branches may have been created)
+  if all
+    refs = Git.ref_names
+  elsif pattern
+    refs = Git.ref_names(pattern)
+  end
+}

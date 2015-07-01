@@ -1,0 +1,57 @@
+usage = <<EOS
+Description
+  Prints an ascii commit graph. This is an alias for:
+  `git --no-pager log --graph --pretty=oneline --abbrev-commit --decorate`
+
+Usage
+ git graph [OPTION]... [GIT_LOG_OPTIONS]
+
+Options
+  -h
+    Show usage
+
+  --verbose
+    Show the git commands being run
+
+Git log options
+  Any additional arguments will be passed along to `git log`
+  Run `git help log` for details.
+
+Examples
+  Show the full history of the current head
+    `git graph`
+
+  Show the history of the current head for the past 7 days
+    `git graph --since "7 days ago"`
+
+  Show the history of a remote branch
+    `git graph origin/master`
+
+  Display a live view of the last 20 commits to HEAD
+    `git watch HEAD --exec "git graph HEAD --max-count=20"`
+EOS
+
+require_relative '../private_lib/yargs'
+
+trap(:SIGINT) do
+  exit 0
+end
+
+yargs = Yargs.new(ARGV, :consume)
+help = yargs.flag(:h)
+verbose = yargs.flag(:verbose)
+
+if help
+  puts usage
+  exit 0
+end
+
+# Make the argv for the git command
+# We'll just pass any remaining arguments along to `git log`
+argv = (%W[git --no-pager log --graph --pretty=oneline --abbrev-commit --decorate]).concat ARGV
+
+# Execute
+puts "[#{argv.join ', '}]" if verbose
+spawn argv[0], *(argv[1..argv.length])
+
+Process.waitall
