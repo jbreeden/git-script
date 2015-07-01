@@ -71,6 +71,7 @@ def do_init(main_branch)
       $stderr.puts "Cannot intialize git report. This does not apper to be a git repo"
       exit 1
     end
+    # TODO: Verify main-branch is recognized by git
     setup_git_report_files
     set_is_first_run(true)
     set_main_branch(main_branch)
@@ -91,25 +92,10 @@ def do_run
   main_branch = get_main_branch
 
   if is_first_run
+    puts "Unsetting first run flag"
     set_is_first_run(false)
-
-    # Log all commits from all references, but only log unique commits once
-    File.open('git_report_logs/commits_0.json', 'w') do |log|
-      visited = []
-      Git.ref_names.each do |ref|
-        new_commits = []
-        Git.log([ref], visited).each do |commit|
-          data = commit.to_h
-          if commit.parents.length == 1
-            data[:kind] = 'commit'
-          else
-            data[:kind] = 'merge-commit'
-          end
-          log.puts(data.to_json)
-        end
-        visited.push ref
-      end
-    end
+    puts "Logging all new commits to the repo"
+    log_new_commits
   end
 
   #TODO Process.daemon
@@ -130,31 +116,47 @@ def do_update
 
   ref = ENV['GIT_WATCH_REF']
   current_head = ENV['GIT_WATCH_CURRENT']
-
-  # Get the last known values for all refs
   previous_values = get_previous_refs
-
-  # Get the master branch name
   main_branch = get_main_branch
-
-  # Get the last known commit for this ref
   prev_head = previous_values[ref]
 
   # Log the new ref head
-  File.open('git_report_logs/heads_0', 'w') do |heads|
-    heads.puts ({ ref: ref, kind: 'ref-head', head: current_head, time: Time.now.to_s }.to_json)
-  end
+  puts "Logging head for #{ref}"
+  log_new_ref_head(ref, current_head)
 
   # Log the new ref commits for this branch
-  new_commits = []
-  puts 'logging ref commits'
+  puts "Logging ref commits for #{ref}"
+  log_new_ref_commits(ref, prev_head)
+
+  puts "Logging all new commits to repo"
+  log_new_commits
+
+  puts "Rewriting head state for #{ref}"
+  rewrite_head_state(ref, current_head)
+end
+
+def rewrite_head_state(ref, head)
+  previous_refs = get_previous_refs
+  File.open('git_report_state/refs.json', 'w') do |f|
+    previous_refs[ref] = head
+    f.puts previous_refs.to_json
+  end
+end
+
+def log_new_ref_head(ref, current_head)
+  File.open('git_report_logs/heads_0.json', 'w') do |heads|
+    heads.puts ({ ref: ref, kind: 'ref-head', head: current_head, time: Time.now.to_s }.to_json)
+  end
+end
+
+def log_new_ref_commits(ref, prev_head)
   begin
     # Determine what commits we've yet to see for this branch
     new_commits = `git rev-list #{ref} #{ '^' + prev_head if prev_head}`.each_line.map { |l|
       l.strip
     }
 
-    File.open('git_report_logs/ref_commits_0', 'a') do |ref_commits|
+    File.open('git_report_logs/ref_commits_0.json', 'a') do |ref_commits|
       new_commits.each do |sha|
         ref_commits.puts ({ kind: 'ref-commit', ref: ref, sha: sha }.to_json)
       end
@@ -162,38 +164,30 @@ def do_update
   rescue StandardError => ex
     $stderr.puts "Error logging new ref commits #{ex}"
   end
+end
 
-  # Log the canonical commit events
-  puts 'logging canonical commits'
-  File.open('git_report_state/commits', 'r') do |f|
-    # Determine the commits that are unique to this ref
-    # If we've seen this commit for another branch, don't log it again
-    # TODO
+def log_new_commits
+  new_commits = nil
+  File.open('git_report_state/excluded_list.txt', 'r') do |exc|
+    exclusions = exc.each_line.map { |l| l.strip }
+    heads = Git.show_ref.map { |ref| ref[:name] }
+    new_commits = Git.log(heads, exclusions)
+  end
 
-    new_commits.each do |sha|
-      commit = log[sha]
-      data = commit.to_h
-      if commit.parents.length == 1
-        data[:kind] = 'commit'
-      else
-        data[:kind] = 'merge-commit'
+  # Log all commits from all references
+  File.open('git_report_state/excluded_list.txt', 'a') do |exc|
+    File.open('git_report_logs/commits_0.json', 'a') do |log|
+      new_commits.each do |commit|
+        data = commit.to_h
+        if commit.parents.length == 1
+          data[:kind] = 'commit'
+        else
+          data[:kind] = 'merge-commit'
+        end
+        log.puts(data.to_json)
+        exc.puts(data[:sha])
       end
-      puts(data.to_json)
     end
-  end
-
-  puts 'Writing report state'
-  # Append new commits to git_report_state/commits
-  File.open('git_report_state/commits', 'a') do |f|
-    new_commits.each do |sha|
-      f.puts sha
-    end
-  end
-
-  # Rewrite current ref's head in git_report_state/refs
-  File.open('git_report_state/refs', 'w') do |f|
-    previous_values[ref] = current_head
-    f.puts previous_values.to_json
   end
 end
 
@@ -231,9 +225,10 @@ def setup_git_report_files
   FileUtils.touch('git_report_logs/commits_0.json')
   FileUtils.touch('git_report_logs/heads_0.json')
   FileUtils.touch('git_report_logs/ref_commits_0.json')
-  File.open('git_report_state/refs', 'w') do |f|
+  File.open('git_report_state/refs.json', 'w') do |f|
     f.puts '{}'
   end
+  FileUtils.touch('git_report_state/excluded_list.txt')
 end
 
 def check_cwd_is_git_repo
@@ -242,7 +237,7 @@ end
 
 def get_previous_refs
   previous_values = nil
-  File.open('git_report_state/refs', 'r') do |f|
+  File.open('git_report_state/refs.json', 'r') do |f|
     previous_values = JSON.parse(f.read)
   end
   previous_values

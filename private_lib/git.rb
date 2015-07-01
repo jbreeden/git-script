@@ -183,8 +183,13 @@ module Git
     refs = []
     regex = pattern ? Regexp.new(pattern) : nil
     `git show-ref`.each_line do |l|
-      refs.push l.strip.split(/\s+/)[1] unless regex && !(l =~ regex)
+      tokens = l.strip.split(/\s+/)
+      refs.push({ sha: tokens[0], name: tokens[1] }) unless regex && !(l =~ regex)
     end
     refs
+  end
+
+  def ref_names(pattern=nil)
+    show_ref(pattern).map { |ref| ref[:name] }
   end
 end
