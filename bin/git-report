@@ -144,7 +144,7 @@ def rewrite_head_state(ref, head)
 end
 
 def log_new_ref_head(ref, current_head)
-  File.open('git_report_logs/heads_0.json', 'w') do |heads|
+  File.open('git_report_logs/heads_0.json', 'a') do |heads|
     heads.puts ({ ref: ref, kind: 'ref-head', head: current_head, time: Time.now.to_s }.to_json)
   end
 end
