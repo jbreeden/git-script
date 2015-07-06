@@ -96,10 +96,16 @@ def do_run
     set_is_first_run(false)
     puts "Logging all new commits to the repo"
     log_new_commits
+
+    puts "Logging all ref heads"
+    Git.show_ref.each do |ref|
+      rewrite_head_state(ref[:name], ref[:sha])
+      log_new_ref_head(ref[:name], ref[:sha], main_branch)
+    end
   end
 
   #TODO Process.daemon
-  spawn "git watch --all --exec 'git report update'"
+  spawn "git watch --all --seed-current --exec 'git report update'"
   Process.waitall
 end
 
@@ -120,13 +126,14 @@ def do_update
   main_branch = get_main_branch
   prev_head = previous_values[ref]
 
+  if current_head == prev_head
+    puts "Skipping unchanged ref #{ref}"
+    return
+  end
+
   # Log the new ref head
   puts "Logging head for #{ref}"
-  log_new_ref_head(ref, current_head)
-
-  # Log the new ref commits for this branch
-  puts "Logging ref commits for #{ref}"
-  log_new_ref_commits(ref, prev_head)
+  log_new_ref_head(ref, current_head, main_branch)
 
   puts "Logging all new commits to repo"
   log_new_commits
@@ -143,26 +150,10 @@ def rewrite_head_state(ref, head)
   end
 end
 
-def log_new_ref_head(ref, current_head)
+def log_new_ref_head(ref, current_head, main_branch)
   File.open('git_report_logs/heads_0.json', 'a') do |heads|
-    heads.puts ({ ref: ref, kind: 'ref-head', head: current_head, time: Time.now.to_s }.to_json)
-  end
-end
-
-def log_new_ref_commits(ref, prev_head)
-  begin
-    # Determine what commits we've yet to see for this branch
-    new_commits = `git rev-list #{ref} #{ '^' + prev_head if prev_head}`.each_line.map { |l|
-      l.strip
-    }
-
-    File.open('git_report_logs/ref_commits_0.json', 'a') do |ref_commits|
-      new_commits.each do |sha|
-        ref_commits.puts ({ kind: 'ref-commit', ref: ref, sha: sha }.to_json)
-      end
-    end
-  rescue StandardError => ex
-    $stderr.puts "Error logging new ref commits #{ex}"
+    merge_base = `git merge-base #{current_head} #{main_branch}`.strip
+    heads.puts ({ ref: ref, kind: 'ref-head', head: current_head, merge_base: merge_base, time: Time.now.to_s }.to_json)
   end
 end
 
@@ -224,7 +215,6 @@ def setup_git_report_files
   Dir.mkdir('git_report_logs')
   FileUtils.touch('git_report_logs/commits_0.json')
   FileUtils.touch('git_report_logs/heads_0.json')
-  FileUtils.touch('git_report_logs/ref_commits_0.json')
   File.open('git_report_state/refs.json', 'w') do |f|
     f.puts '{}'
   end

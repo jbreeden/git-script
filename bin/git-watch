@@ -129,10 +129,10 @@ loop {
     curr_val = `git rev-parse #{ref}`.strip
 
     if curr_val != prev_values[ref]
+      # TODO: Set a first run flag
       ENV['GIT_WATCH_REF'] = ref
       ENV['GIT_WATCH_PREVIOUS'] = prev_values[ref] || ''
       ENV['GIT_WATCH_CURRENT'] = curr_val
-      puts "Executing watch command for #{ENV['GIT_WATCH_REF']}"
       spawn command
       Process.waitall
     end
