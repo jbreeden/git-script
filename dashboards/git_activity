@@ -1,0 +1,96 @@
+<form>
+  <label>Git Activity</label>
+  <row>
+    <panel>
+      <chart>
+        <title>Commits Past 30 Days</title>
+        <search>
+          <query>index=git kind=*commit earliest=-30d | stats count</query>
+          <earliest>0</earliest>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">false</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">radialGauge</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.chart.rangeValues">[0,"500",1000,"1500","2000","2500"]</option>
+        <option name="charting.gaugeColors">[0x84E900,0xc2da8a,0xfac61d,0xf7912c,0xd13b3b]</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <input type="text" token="branch_name" searchWhenChanged="true">
+        <label>Branch Name</label>
+        <seed>*</seed>
+      </input>
+      <table>
+        <title>Diverging Branches</title>
+        <search>
+          <query>index=git kind="independent-branch" branch_name="*$branch_name$*"  | eval commit_epoch=strptime(committer_date, "%Y-%m-%d %H:%M:%S %Z")     | eval merge_base_commit_epoch = strptime(merge_base_committer_date, "%Y-%m-%d %H:%M:%S %Z")     | eval Age=(commit_epoch - merge_base_commit_epoch)    | fieldformat Age=tostring(Age, "duration")  | rename branch_name AS "Branch Name"  merge_base_committer_date AS "Merge Base Time" committer_date AS "HEAD Time" merge_base as "Merge Base Commit" sha AS "HEAD Commit" title AS "HEAD Commit Message"  | sort -Age  | table "Age" "Merge Base Time" "Merge Base Commit" "HEAD Time" "HEAD Commit" "HEAD Commit Message" "Branch Name"</query>
+          <earliest>0</earliest>
+        </search>
+        <option name="wrap">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <input type="text" token="author" searchWhenChanged="true">
+        <label>Author</label>
+        <seed>*</seed>
+      </input>
+      <input type="text" token="title_text" searchWhenChanged="true">
+        <label>Title</label>
+        <seed>*</seed>
+      </input>
+      <table>
+        <title>Commit Log</title>
+        <search>
+          <query>index=git kind=*commit title="*$title_text$*" author_name="*$author$*" | rename sha AS Commit author_name AS Name author_date as Time title AS Title | sort -Time | table Time Name Commit Title</query>
+          <earliest>0</earliest>
+        </search>
+        <option name="wrap">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Most Epic Day (Past 30 Days)</title>
+        <search>
+          <query>index=git kind=*commit    | eval day = strftime(strptime(author_date, "%Y-%m-%d %H:%M:%S %Z"),"%Y-%m-%d")    | eval top_author_day = 'author_name' . "_" . 'author_email' . "_" . 'day'    | search [       search index=git kind=*commit earliest=-30d          | eval day = strftime(strptime(author_date, "%Y-%m-%d %H:%M:%S %Z"),"%Y-%m-%d")          | eval author_day = 'author_name' . "_" . 'author_email' . "_" . 'day'          | stats count AS "commits" first(author_day) AS top_author_day by author_day          | sort -commits | head 1 | fields top_author_day ]   | rename author_date AS "Date"   | rename author_name AS "Name"   | rename sha AS "Commit"   | rename title AS "Title"   | table Date Name Commit Title</query>
+        </search>
+        <option name="wrap">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="count">15</option>
+      </table>
+    </panel>
+  </row>
+</form>
