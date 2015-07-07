@@ -43,8 +43,19 @@
       <table>
         <title>Diverging Branches</title>
         <search>
-          <query>index=git kind="independent-branch" branch_name="*$branch_name$*"  | eval commit_epoch=strptime(committer_date, "%Y-%m-%d %H:%M:%S %Z")     | eval merge_base_commit_epoch = strptime(merge_base_committer_date, "%Y-%m-%d %H:%M:%S %Z")     | eval Age=(commit_epoch - merge_base_commit_epoch)    | fieldformat Age=tostring(Age, "duration")  | rename branch_name AS "Branch Name"  merge_base_committer_date AS "Merge Base Time" committer_date AS "HEAD Time" merge_base as "Merge Base Commit" sha AS "HEAD Commit" title AS "HEAD Commit Message"  | sort -Age  | table "Age" "Merge Base Time" "Merge Base Commit" "HEAD Time" "HEAD Commit" "HEAD Commit Message" "Branch Name"</query>
+          <query>index=git kind=ref-head
+| where (head != merge_base)
+| rename head as head_sha merge_base as merge_base_sha
+| join type=left head_sha [ search index=git kind=*commit | fields sha committer_date | rename * AS head_* ]
+| join type=left merge_base_sha [ search index=git kind=*commit | fields sha committer_date | rename * AS merge_base_* ]
+| eval merge_base_epoch = strptime(merge_base_committer_date, "%Y-%m-%d %H:%M:%S %Z")
+| eval "Branch Age"=tostring(strptime(head_committer_date, "%Y-%m-%d %H:%M:%S %Z") - merge_base_epoch, "duration")
+| eval master_epoch = [search index=git ref="*/origin/develop" | join head [search index=git kind=*commit | rename sha as head] | fields committer_date | eval committer_date = strptime(committer_date, "%Y-%m-%d %H:%M:%S %Z") | rename committer_date as search]
+| eval "Master Age" = tostring(master_epoch - merge_base_epoch, "duration")
+| rename ref as Branch head_committer_date as "Last Commit" merge_base_committer_date as "Merge Base"
+| table Branch "Merge Base" "Last Commit" "Branch Age" "Master Age"</query>
           <earliest>0</earliest>
+          <latest></latest>
         </search>
         <option name="wrap">false</option>
         <option name="rowNumbers">false</option>
