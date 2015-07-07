@@ -97,15 +97,16 @@ def do_run
     puts "Logging all new commits to the repo"
     log_new_commits
 
-    puts "Logging all ref heads"
     Git.show_ref.each do |ref|
+      puts "Logging ref head for #{ref[:name]}"
       rewrite_head_state(ref[:name], ref[:sha])
       log_new_ref_head(ref[:name], ref[:sha], main_branch)
     end
   end
 
   #TODO Process.daemon
-  spawn "git watch --all --seed-current --exec 'git report update'"
+  puts "Kicking off git watch"
+  spawn "git watch --all --exec 'git report update'"
   Process.waitall
 end
 
