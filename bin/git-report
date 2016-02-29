@@ -106,7 +106,7 @@ def do_run
 
   #TODO Process.daemon
   puts "Kicking off git watch"
-  spawn "git watch --all --exec 'git report update'"
+  spawn "git watch --all --fetch --exec 'git report update'"
   Process.waitall
 end
 
