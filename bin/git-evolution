@@ -1,0 +1,17 @@
+=begin
+Runs a `git show` on each commit of a file between two revisions.
+(Use 'q' to quit one revision and go to the next)
+=end
+
+require_relative '../private_lib/yargs'
+
+yargs = Yargs.new(ARGV, :consume)
+file = yargs.value(:file)
+from = yargs.value(:from)
+to = yargs.value(:to)
+
+IO.popen("git log --pretty=oneline ^#{from}^ #{to} -- #{file}", 'r') do |io|
+  io.each_line do |line|
+    system "git show --no-color #{line[/\S+/]} -- #{file} | less"
+  end
+end
