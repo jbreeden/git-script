@@ -7,15 +7,15 @@ Why?
 ----
 
 - Ruby runs the same on Windows, Mac, and Linux without needing something like cygwin.
-  + Plus, Ruby > Bash.
-- RubyGems handles making binstubs for every platform & setting up the path.
-  + 'Cuz I want to type `git watch ...`, not `git watch.rb ...`, and not `ruby C:\my\scripts\git-watch ...`
+- RubyGems handles making binstubs for every platform & adding the binaries to your PATH.
 
 How?
 ----
 
 ```
-rake install
+git clone https://github.com/jbreeden/git-scripts
+cd git-scripts
+rake install # May need sudo
 ```
 
 Thanks!
