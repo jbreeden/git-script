@@ -1,0 +1,9 @@
+#! /usr/bin/env ruby
+
+cmd = "git mv '#{ARGV[0]}' '#{ARGV[0]}.git.rename'"
+puts cmd
+system cmd
+
+cmd = "git mv '#{ARGV[0]}.git.rename' '#{ARGV[1]}'"
+puts cmd
+system cmd
