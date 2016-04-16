@@ -26,13 +26,13 @@ class Node
     end
   end
   
-  def descend(&block)
+  def walk(&block)
     block[self]
-    self.descend_children(&block)
+    self.walk_children(&block)
   end
   
-  def descend_children(&block)
-    self.children.each { |c| c.descend(&block) }
+  def walk_children(&block)
+    self.children.each { |c| c.walk(&block) }
   end
   
   def root?

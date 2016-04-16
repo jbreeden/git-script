@@ -1,14 +1,49 @@
 #! /usr/bin/env ruby
 
+require_relative '../private_lib/yargs'
 require_relative '../private_lib/git'
+
+usage = <<EOS
+Description
+  Walks each node in the tree of a given commit & executes a ruby script
+  for each node.
+  
+Usage
+  git walk-tree COMMITISH [SCRIPT]
+
+Arguments
+  COMMITISH
+    A reference to a commit (like 'HEAD' or 'develop'), tag, etc.
+    
+  SCRIPT
+    A ruby script to execute for each node in the tree. When invoked, the
+    script can access the local variable `node` or the global `$NODE` for
+    properties of the node (like the `path`, `absolute_path`, `name`, & `type`).
+    OPTIONAL: If not given, the script is read from stdin.
+    
+  REPLACEMENT
+    A replacement string. May include backreferences as supported by Ruby's
+    Regexp.
+EOS
+
+yargs = Yargs.new(ARGV, :consume)
+if yargs.flag(:h, :help)
+  puts usage
+  exit 0
+end
+
+if ARGV.length != 1 && ARGV.length != 2
+  $stderr.puts usage
+  exit 1
+end
 
 exit_code = 0
 
-script = ARGV.length > 0 ? ARGV[0] : $stdin.read
+script = ARGV.length == 2 ? ARGV[1] : $stdin.read
 compiled_script = eval("proc { |node|\n#{script}\n}")
 
 Dir.chdir(Git.root) do
-    Tree.head.descend_children do |node|
+    Tree.from_ref(ARGV[0]).walk_children do |node|
         $NODE = node
         begin
           compiled_script.call(node)

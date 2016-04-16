@@ -7,22 +7,57 @@ require_relative '../private_lib/git'
 yargs = Yargs.new(ARGV, :consume)
 dry_run = yargs.flag('dry-run')
 
-pattern = Regexp.new(ARGV[0])
-replacement = ARGV[1]
-if replacement.start_with?('{') && replacement.end_with?('}')
-  replacement = eval(replacement)
+usage = <<EOS
+Description
+  Rename all files recursively via regexp matching & substitution.
+  Only works on files that are in the current HEAD commit (files that
+  exist only on disk or in the index will be skipped).
+
+Usage
+  git rename-all PATTERN REPLACEMENT
+
+Options
+  -i, --ignore-case
+    Consider PATTERN to be a case insensitive regular expression.
+
+Arguments
+  PATTERN
+    A regular expression. Will be recursively tested against each file & 
+    directory name in the current HEAD tree.
+    
+  REPLACEMENT
+    A replacement string. May include backreferences as supported by Ruby's
+    Regexp.
+EOS
+
+if yargs.flag(:h, :help)
+  puts usage
+  exit 0
 end
 
-Tree.head.descend_children do |node|
-  if pattern =~ node.name
-    old_path = node.path
-    node.name.gsub!(pattern, replacement)
-    cmd = "git rename #{old_path} #{node.path}"
-    if dry_run
-      puts cmd
-    else
-      puts cmd
-      system(cmd)
+if ARGV.length != 2
+  $stderr.puts usage
+  exit 1
+end
+
+regexp_opt = ''
+regexp_opt += 'i' if yargs.flag(:i, :'ignore-case')
+pattern = Regexp.new(ARGV[0], regexp_opt.length > 0 ? regexp_opt : nil)
+
+replacement = ARGV[1]
+
+Dir.chdir(Git.root) do
+  Tree.head.walk_children do |node|
+    if pattern =~ node.name
+      old_path = node.path
+      node.name.gsub!(pattern, replacement)
+      cmd = "git rename #{old_path} #{node.path}"
+      if dry_run
+        puts cmd
+      else
+        puts cmd
+        system(cmd)
+      end
     end
   end
 end
