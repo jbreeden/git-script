@@ -1,9 +1,14 @@
 #! /usr/bin/env ruby
 
+require_relative '../private_lib/yargs'
+
+yargs = Yargs.new(ARGV, :consume)
+verbose = yargs.flag(:v, :verbose)
+
 cmd = "git mv '#{ARGV[0]}' '#{ARGV[0]}.git.rename'"
-puts cmd
+puts cmd if verbose
 system cmd
 
 cmd = "git mv '#{ARGV[0]}.git.rename' '#{ARGV[1]}'"
-puts cmd
+puts cmd if verbose
 system cmd

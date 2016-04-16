@@ -1,0 +1,28 @@
+#! /usr/bin/env ruby
+
+require 'pp'
+require_relative '../private_lib/yargs'
+require_relative '../private_lib/git'
+
+yargs = Yargs.new(ARGV, :consume)
+dry_run = yargs.flag('dry-run')
+
+pattern = Regexp.new(ARGV[0])
+replacement = ARGV[1]
+if replacement.start_with?('{') && replacement.end_with?('}')
+  replacement = eval(replacement)
+end
+
+Tree.head.descend_children do |node|
+  if pattern =~ node.name
+    old_path = node.path
+    node.name.gsub!(pattern, replacement)
+    cmd = "git rename #{old_path} #{node.path}"
+    if dry_run
+      puts cmd
+    else
+      puts cmd
+      system(cmd)
+    end
+  end
+end

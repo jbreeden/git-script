@@ -1,0 +1,4 @@
+#!/usr/bin/env ruby 
+
+require_relative '../private_lib/git'
+puts Git.root

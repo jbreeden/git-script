@@ -1,0 +1,22 @@
+#! /usr/bin/env ruby
+
+require_relative '../private_lib/git'
+
+exit_code = 0
+
+script = ARGV.length > 0 ? ARGV[0] : $stdin.read
+compiled_script = eval("proc { |node|\n#{script}\n}")
+
+Dir.chdir(Git.root) do
+    Tree.head.descend_children do |node|
+        $NODE = node
+        begin
+          compiled_script.call(node)
+        rescue Exception => ex
+          exit_code = 1
+          $stderr.puts("ERROR @ #{node.path}: #{ex.message}")
+        end
+    end
+end
+
+exit exit_code
