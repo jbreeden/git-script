@@ -18,14 +18,6 @@ class Node
     end
   end
   
-  def absolute_path
-    if self.parent
-      File.join(self.parent.absolute_path, self.name)
-    else
-      File.join(Git.root, self.name)
-    end
-  end
-  
   def walk(&block)
     block[self]
     self.walk_children(&block)
@@ -70,7 +62,6 @@ class Tree < Node
     def path
       Git.root
     end
-    alias absolute_path path
     
     def root?
       true
@@ -81,37 +72,49 @@ class Tree < Node
     self.from_ref('HEAD')
   end
   
-  def self.from_ref(ref)
-    # Temporary limitation. Not sure how to get the relative path
-    # from the project root if given a ref like HEAD:src/modules
-    # (Suppose it's given as an OID, I don't believe you can get 
-    #  the relative path. Consider also that objects in the db
-    #  can be used by multiple trees...)
-    if Git.object_type(ref) != 'commit'
-      raise "Expected a commit reference"
+  def self.from_ref(ref, path=nil)
+    unless ['commit', 'tree'].include?(Git.object_type(ref))
+      raise "Expected a reference to a commit or tree"
     end
     
     tree = Root.new(ref, Git.rev_parse(ref))
     files = nil
-    Dir.chdir(Git.root) do
+
+    make_tree = proc {
       `git ls-tree -r -t #{ref}`.split("\n").map { |line|
         line.strip
       }.select { |line|
         line && line.length > 0
-      }.each { |line|
-        tokens = Node.tokenize(line)
-        name = File.basename(tokens['path'])
+      }.map { |line|
+        Node.tokenize(line)
+      }.each { |tokens|
+        parent_names = tokens['path'].split(File::SEPARATOR).select { |p| 
+          !p.nil? && p.length > 0
+        }
+        if tokens['path'].start_with?(File::SEPARATOR)
+          parent_names.unshift(File::SEPARATOR)
+        end
+
+        name = parent_names.pop
         
+        next if name == '.' || name == '..'
+
         new_node = tokens['type'] == 'blob' ?
           Blob.new(name, tokens['sha']) :
           Tree.new(name, tokens['sha'])
-        
-        new_node.parent = tokens['path'].include?(File::SEPARATOR) ?
-        tree[File.dirname(tokens['path'])] :
-        tree
-        
+
+        new_node.parent = parent_names.length > 0 ?
+          parent_names.inject(tree) { |tree, parent| tree[parent] } :
+          tree
+
         new_node.parent.children.push(new_node)
       }
+    }
+    
+    if path
+      Dir.chdir(path, &make_tree)
+    else
+      make_tree[]
     end
     
     tree

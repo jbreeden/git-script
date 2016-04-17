@@ -55,7 +55,7 @@ Options
 
   How to Repeat
     --fetch
-      Run a `git fetch --all` between each interation
+      Run a `git fetch --all` between each iteration
 
     --interval SECONDS
       Sleep for this long between polling cycles.

@@ -9,24 +9,25 @@ Description
   for each node.
   
 Usage
-  git walk-tree COMMITISH [SCRIPT]
+  git walk-tree [--script RUBY_STRING] [TREE [PATH]]
 
-Arguments
-  COMMITISH
-    A reference to a commit (like 'HEAD' or 'develop'), tag, etc.
-
-  SCRIPT
+Options
+  -s, --script (OPTIONAL: If not given, the script is read from stdin.)
     A ruby script to execute for each node in the tree. When invoked, the
     script can access the local variable `node` or the global `$NODE` for
     properties of the node (like the `path`, `absolute_path`, `name`, & `type`).
-    OPTIONAL: If not given, the script is read from stdin.
+    
+Arguments
+  TREE (OPTIONAL: Defaults to HEAD)
+    A reference to a tree, commit, or tag.
   
-  REPLACEMENT
-    A replacement string. May include backreferences as supported by Ruby's
-    Regexp.
+  PATH (OPTIONAL: Defaults to the current working directory)
+    The root path from which to start the walk. This will be the current
+    working directory with the script is invoked.
 EOS
   
 yargs = Yargs.new(ARGV, :consume)
+
 if yargs.flag(:h, :help)
   puts $usage
   exit 0
@@ -39,22 +40,25 @@ def bail(msg=nil)
   exit 1
 end
 
-if ARGV.length != 1 && ARGV.length != 2
+script = yargs.value(:s, :script) || $stdin.read
+compiled_script = eval("proc { |node|\n#{script}\n}")
+
+unless (0..2).to_a.include?(ARGV.length)
   $stderr.puts $usage
   exit 1
 end
 
 exit_code = 0
 
-script = ARGV.length == 2 ? ARGV[1] : $stdin.read
-compiled_script = eval("proc { |node|\n#{script}\n}")
+ref = ARGV[0] || 'HEAD'
+path = ARGV[1] || nil
 
-if Git.object_type(ARGV[0]) != 'commit'
-  bail("Not a valid commit reference: #{ARGV[0]}")
+unless ['commit', 'tree'].include?(Git.object_type(ref))
+  bail("Not a valid commit or tree reference: #{ref}")
 end
 
-Dir.chdir(Git.root) do
-  Tree.from_ref(ARGV[0]).walk_children do |node|
+walk = proc {
+  Tree.from_ref(ref).walk_children do |node|
     $NODE = node
     begin
       compiled_script.call(node)
@@ -63,6 +67,15 @@ Dir.chdir(Git.root) do
       $stderr.puts("ERROR @ #{node.path}: #{ex.message}")
     end
   end
+}
+
+# Change directory to root instead of dealing with
+# ancestor directory references (normalized paths to have names instead
+# of '../..')
+if path
+  Dir.chdir(path, &walk)
+else
+  walk[]
 end
 
 exit exit_code
