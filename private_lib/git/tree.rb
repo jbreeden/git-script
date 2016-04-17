@@ -82,6 +82,15 @@ class Tree < Node
   end
   
   def self.from_ref(ref)
+    # Temporary limitation. Not sure how to get the relative path
+    # from the project root if given a ref like HEAD:src/modules
+    # (Suppose it's given as an OID, I don't believe you can get 
+    #  the relative path. Consider also that objects in the db
+    #  can be used by multiple trees...)
+    if Git.object_type(ref) != 'commit'
+      raise "Expected a commit reference"
+    end
+    
     tree = Root.new(ref, Git.rev_parse(ref))
     files = nil
     Dir.chdir(Git.root) do

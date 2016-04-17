@@ -112,4 +112,12 @@ module Git
   def ref_names(pattern=nil)
     show_ref(pattern).map { |ref| ref[:name] }
   end
+  
+  def object_type(ref)
+    begin
+      git("cat-file -t #{ref}")
+    rescue
+      nil
+    end
+  end
 end
