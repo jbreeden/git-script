@@ -1,7 +1,7 @@
 Contents
 --------
 
-Some cross platform scripts wrapped up in a Ruby gem.
+Some cross platform custom git commands wrapped up in a Ruby gem.
 
 Installation
 ------------
