@@ -1,1 +1,1 @@
-system "git push origin `git branch-name`"
+system "git push origin #{`git branch-name`.strip}"
