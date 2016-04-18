@@ -1,1 +1,1 @@
-puts `git symbolic-ref --short HEAD`
+system 'git symbolic-ref --short HEAD'
