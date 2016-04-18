@@ -49,16 +49,25 @@ end
 pattern = Regexp.new(ARGV[0], regexp_opt.length > 0 ? regexp_opt : nil)
 replacement = ARGV[1]
 
+error = false
 Tree.head.walk_children do |node|
   if pattern =~ node.name
     old_path = node.path
-    node.name.gsub!(pattern, replacement)
-    cmd = "git rename #{old_path} #{node.path}"
-    if dry_run
-      puts cmd
+    new_name = node.name.gsub(pattern, replacement)
+    new_path = ((node.parent && "#{node.parent.path}#{File::SEPARATOR}") || '') + new_name
+    
+    cmd = "git rename #{old_path} #{new_path}"
+    puts cmd
+    if system(cmd)
+        node.name = new_name
     else
-      puts cmd
-      system(cmd)
+        error = true
     end
   end
+end
+
+if error
+    exit 1
+else
+    exit 0
 end

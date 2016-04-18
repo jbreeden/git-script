@@ -69,7 +69,7 @@ class Tree < Node
   end
   
   def self.head
-    self.from_ref('HEAD')
+    @head ||= self.from_ref('HEAD')
   end
   
   def self.from_ref(ref, path=nil)

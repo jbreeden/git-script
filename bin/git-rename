@@ -5,10 +5,22 @@ require_relative '../private_lib/yargs'
 yargs = Yargs.new(ARGV, :consume)
 verbose = yargs.flag(:v, :verbose)
 
+if system("git cat-file -t HEAD:#{ARGV[1]} > /dev/null 2> /dev/null")
+    $stderr.puts "ERROR: Cannot rename '#{ARGV[0]}' to '#{ARGV[1]}' (file already exists)"
+    exit 1
+end
+
 cmd = "git mv '#{ARGV[0]}' '#{ARGV[0]}.git.rename'"
 puts cmd if verbose
-system cmd
+unless system(cmd)
+    $stderr.puts "Reverting intermediate rename..."
+    cmd = "git mv '#{ARGV[0]}.git.rename' '#{ARGV[0]}'"
+    system(cmd)
+    exit 1
+end
 
 cmd = "git mv '#{ARGV[0]}.git.rename' '#{ARGV[1]}'"
 puts cmd if verbose
-system cmd
+unless system(cmd)
+    exit 1
+end
