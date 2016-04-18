@@ -5,7 +5,7 @@ require_relative '../private_lib/yargs'
 yargs = Yargs.new(ARGV, :consume)
 verbose = yargs.flag(:v, :verbose)
 
-if system("git cat-file -t HEAD:#{ARGV[1]} > /dev/null 2> /dev/null")
+if system("git cat-file -t HEAD:#{ARGV[1]} > #{File::NULL} 2> #{File::NULL}")
     $stderr.puts "ERROR: Cannot rename '#{ARGV[0]}' to '#{ARGV[1]}' (file already exists)"
     exit 1
 end
