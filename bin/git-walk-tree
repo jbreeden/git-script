@@ -5,17 +5,17 @@ require_relative '../private_lib/git'
 
 $usage = <<EOS
 Description
-  Walks each node in the tree of a given commit & executes a ruby script
-  for each node.
+  Walks each node in a given tree (or commit) & executes a ruby script
+  for each node. When invoked, the script can access the local variable
+  `node` or the global `$NODE` for properties of the node (like the `path`,
+  `name`, & `type`).
   
 Usage
   git walk-tree [--script RUBY_STRING] [TREE [PATH]]
 
 Options
   -s, --script (OPTIONAL: If not given, the script is read from stdin.)
-    A ruby script to execute for each node in the tree. When invoked, the
-    script can access the local variable `node` or the global `$NODE` for
-    properties of the node (like the `path`, `absolute_path`, `name`, & `type`).
+    A ruby script to execute for each node in the tree.
     
 Arguments
   TREE (OPTIONAL: Defaults to HEAD)
