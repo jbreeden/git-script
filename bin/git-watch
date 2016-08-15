@@ -1,3 +1,5 @@
+#!/usr/bin/env ruby
+
 usage = <<EOS
 Description
   Watch a git reference (like HEAD) for changes. Each time the value of the reference

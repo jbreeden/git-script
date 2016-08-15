@@ -1,3 +1,5 @@
+#!/usr/bin/env ruby
+
 =begin
 Runs a `git show` on each commit of a file between two revisions.
 (Use 'q' to quit one revision and go to the next)

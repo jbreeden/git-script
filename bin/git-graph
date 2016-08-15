@@ -1,3 +1,5 @@
+#!/usr/bin/env ruby
+
 usage = <<EOS
 Description
   Prints an ascii commit graph. This is an alias for:
